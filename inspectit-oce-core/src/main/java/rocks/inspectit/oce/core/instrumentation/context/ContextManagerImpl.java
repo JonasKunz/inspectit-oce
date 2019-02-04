@@ -3,7 +3,7 @@ package rocks.inspectit.oce.core.instrumentation.context;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import io.grpc.Context;
-import rocks.inspectit.oce.bootstrap.context.ContextManager;
+import rocks.inspectit.oce.bootstrap.version.context.ContextManager;
 import rocks.inspectit.oce.core.config.spring.BootstrapInitializerConfiguration;
 
 import java.util.concurrent.Callable;

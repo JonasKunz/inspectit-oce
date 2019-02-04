@@ -1,4 +1,4 @@
-package rocks.inspectit.oce.bootstrap.context;
+package rocks.inspectit.oce.bootstrap.version.context;
 
 import java.util.concurrent.Callable;
 

@@ -1,3 +1,7 @@
+plugins {
+    id 'com.github.johnrengelman.shadow' version '4.0.4'
+}
+
 dependencies {
     compileOnly(
             project(':inspectit-oce-bootstrap'),
@@ -5,21 +9,81 @@ dependencies {
 }
 
 jar {
-    destinationDir = buildDir
-    archivesBaseName = "${project.name}"
+    dependsOn shadowJar
+}
 
-    manifest {
-        from file("src/main/resources/META-INF/MANIFEST.MF")
-    }
+if(version == "SNAPSHOT") {
+    ext.versionPackage='versionsnapshot_' + System.currentTimeMillis()
+} else {
+    ext.versionPackage="version${version}".replace('.','_')
+}
 
-    from project(':inspectit-oce-bootstrap').jar.outputs
+
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+task relocateVersionPackageCoreJar(type: ShadowJar) {
+    dependsOn project(':inspectit-oce-core').jar
+
+    group = 'Build'
+    destinationDir = new File("${buildDir}/jarGen/${versionPackage}")
+
+    baseName = 'inspectit-oce-core'
+    classifier = null
+    version = null
+    extension = "jar.zip"
+
+    configurations = []
+
     from project(':inspectit-oce-core').jar.outputs
 
-    //include all "implementation" dependencies in fat jar
-    from {
-        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
-    }
+    relocate 'rocks.inspectit.oce.agent.version.', "rocks.inspectit.oce.agent.${versionPackage}."
+    relocate 'rocks.inspectit.oce.bootstrap.version.', "rocks.inspectit.oce.bootstrap.${versionPackage}."
 }
+
+
+task relocateVersionPackageBootstrapJar(type: ShadowJar) {
+    dependsOn project(':inspectit-oce-bootstrap').jar
+
+    group = 'Build'
+    destinationDir = new File("${buildDir}/jarGen/${versionPackage}")
+
+    baseName = 'inspectit-oce-bootstrap'
+    classifier = null
+    version = null
+    extension = "jar.zip"
+
+    configurations = []
+
+    from project(':inspectit-oce-bootstrap').jar.outputs
+
+    relocate 'rocks.inspectit.oce.agent.version.', "rocks.inspectit.oce.agent.${versionPackage}."
+    relocate 'rocks.inspectit.oce.bootstrap.version.', "rocks.inspectit.oce.bootstrap.${versionPackage}."
+}
+
+shadowJar {
+    dependsOn relocateVersionPackageCoreJar
+    dependsOn relocateVersionPackageBootstrapJar
+
+    destinationDir = buildDir
+    classifier = null
+
+    manifest {
+        attributes "Agent-Class": "rocks.inspectit.oce.agent.${versionPackage}.AgentMain"
+        attributes "Premain-Class": "rocks.inspectit.oce.agent.${versionPackage}.AgentMain"
+        attributes "Can-Redefine-Classes": "true"
+        attributes "Can-Retransform-Classes": "true"
+    }
+
+    into "rocks/inspectit/oce/agent/${versionPackage}", {
+        from "${buildDir}/jarGen/${versionPackage}"
+    }
+
+    relocate 'rocks.inspectit.oce.agent.version.', "rocks.inspectit.oce.agent.${versionPackage}."
+    relocate 'rocks.inspectit.oce.bootstrap.version.', "rocks.inspectit.oce.bootstrap.${versionPackage}."
+}
+
+
+
+
 
 //----------------------------------------------------------------------------------------------------------------------
 // Based on the integration tests of https://github.com/census-instrumentation/opencensus-java/tree/master/contrib/agent
@@ -79,7 +143,7 @@ task systemTest {
     assert javaExecutables.size > 0 :
             'No Java executables found for running system tests'
 
-    def agentJarPath = jar.archivePath.toString()
+    def agentJarPath = shadowJar.archivePath.toString()
 
     javaExecutables.eachWithIndex { javaExecutable, index ->
         def paths = "${javaExecutable}".tokenize(File.separator)
@@ -117,6 +181,7 @@ task systemTest {
             jacoco {
                 includeNoLocationClasses = true
                 includes = ["rocks/inspectit/*"]
+                excludes = ["rocks/inspectit/oce/bootstrap/*", "rocks/inspectit/oce/agent/*"]
             }
 
             // The JaCoCo agent must be specified first so that it can instrument our agent.

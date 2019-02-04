@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import rocks.inspectit.oce.bootstrap.IAgent;
+import rocks.inspectit.oce.bootstrap.version.VersionProvider;
 import rocks.inspectit.oce.core.config.InspectitEnvironment;
 import rocks.inspectit.oce.core.config.spring.SpringConfiguration;
 import rocks.inspectit.oce.core.logging.logback.LogbackInitializer;
@@ -32,7 +33,7 @@ public class AgentImpl implements IAgent {
         LOGGER = LoggerFactory.getLogger(AgentImpl.class);
     }
 
-    private static final String OPENCENSUS_FAR_JAR_PATH = "/opencensus-fat.jar";
+    private static final String OPENCENSUS_FAR_JAR_PATH = "opencensus-fat.jar";
 
     /**
      * Logger that is initialized in the static init block
@@ -48,7 +49,7 @@ public class AgentImpl implements IAgent {
     public void start(String cmdArgs, Instrumentation instrumentation) {
         ClassLoader classloader = AgentImpl.class.getClassLoader();
 
-        LOGGER.info("Starting inspectIT OCE Agent...");
+        LOGGER.info("Starting inspectIT OCE Agent {} ...", VersionProvider.getVersion());
 
         ctx = new AnnotationConfigApplicationContext();
         ctx.setClassLoader(classloader);

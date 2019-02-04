@@ -6,8 +6,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import rocks.inspectit.oce.bootstrap.Instances;
-import rocks.inspectit.oce.bootstrap.context.ContextManager;
+import rocks.inspectit.oce.bootstrap.version.Instances;
+import rocks.inspectit.oce.bootstrap.version.context.ContextManager;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;

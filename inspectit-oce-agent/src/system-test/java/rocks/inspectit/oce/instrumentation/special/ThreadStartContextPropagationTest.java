@@ -5,8 +5,6 @@ import io.opencensus.tags.*;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.util.Iterator;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -104,25 +102,27 @@ public class ThreadStartContextPropagationTest {
     }
 
     @Test
-    public void verifyNoContextProgapationViaRun() throws Exception {
+    public void verifyNoContextProgapationViaDirectRunInvocation() {
         TagKey tagKey = TagKey.create("test-tag-key");
         TagValue tagValue = TagValue.create("test-tag-value");
-        CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<Iterator<Tag>> refTags = new AtomicReference<>();
 
-        Class<?> instances = Class.forName("rocks.inspectit.oce.bootstrap.Instances");
-        Field contextManager = instances.getDeclaredField("contextManager");
-        Object contextManagerInstance = contextManager.get(null);
-        Class contextManagerClass = contextManagerInstance.getClass();
-        Method storeContextForThread = contextManagerClass.getDeclaredMethod("storeContextForThread", Thread.class);
 
-        Thread thread = new Thread(() -> {
-            Iterator<Tag> iter = InternalUtils.getTags(tagger.getCurrentTagContext());
-            refTags.set(iter);
-        });
+        Thread thread = new Thread() {
+            @Override
+            public synchronized void start() {
+                //do not actually start a thread, just attach the context.
+            }
+
+            @Override
+            public void run() {
+                Iterator<Tag> iter = InternalUtils.getTags(tagger.getCurrentTagContext());
+                refTags.set(iter);
+            }
+        };
 
         try (Scope s = tagger.currentBuilder().put(tagKey, tagValue).buildScoped()) {
-            storeContextForThread.invoke(contextManagerInstance, thread);
+            thread.start();
         }
 
         thread.run();

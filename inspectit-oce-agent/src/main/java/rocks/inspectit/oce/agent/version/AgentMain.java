@@ -1,4 +1,4 @@
-package rocks.inspectit.oce.agent;
+package rocks.inspectit.oce.agent.version;
 
 import rocks.inspectit.oce.bootstrap.AgentManager;
 
@@ -22,11 +22,10 @@ import java.util.jar.JarFile;
  */
 public class AgentMain {
 
-    private static final String INSPECTIT_BOOTSTRAP_JAR_PATH = "/inspectit-oce-bootstrap.jar";
-    private static final String INSPECTIT_CORE_JAR_PATH = "/inspectit-oce-core.jar";
+    private static final String INSPECTIT_BOOTSTRAP_JAR_PATH = "inspectit-oce-bootstrap.jar.zip";
+    private static final String INSPECTIT_CORE_JAR_PATH = "inspectit-oce-core.jar.zip";
 
     public static void agentmain(String agentArgs, Instrumentation inst) {
-        //TODO: currently replacing the agent does not really work as all Agent versions share the same namespace in the same classpath
         premain(agentArgs, inst);
     }
 

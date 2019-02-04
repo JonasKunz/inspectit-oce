@@ -78,7 +78,7 @@ dependencies {
 
 task buildOpencensusFatJar(type: Jar) {
     archiveName = "opencensus-fat.jar"
-    destinationDir = file("$buildDir/jarGen")
+    destinationDir = file("$buildDir/jarGen/rocks/inspectit/oce/core")
     from {
         configurations.opencensus.collect { it.isDirectory() ? it : zipTree(it) }
     }

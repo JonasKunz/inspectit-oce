@@ -7,7 +7,7 @@ import net.bytebuddy.dynamic.DynamicType;
 import net.bytebuddy.matcher.ElementMatcher;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Component;
-import rocks.inspectit.oce.bootstrap.Instances;
+import rocks.inspectit.oce.bootstrap.version.Instances;
 import rocks.inspectit.oce.core.instrumentation.config.model.InstrumentationConfiguration;
 import rocks.inspectit.oce.core.instrumentation.context.ContextManagerImpl;
 

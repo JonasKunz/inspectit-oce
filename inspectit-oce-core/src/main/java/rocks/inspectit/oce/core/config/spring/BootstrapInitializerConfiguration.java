@@ -2,8 +2,8 @@ package rocks.inspectit.oce.core.config.spring;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import rocks.inspectit.oce.bootstrap.Instances;
-import rocks.inspectit.oce.bootstrap.noop.NoopContextManager;
+import rocks.inspectit.oce.bootstrap.version.Instances;
+import rocks.inspectit.oce.bootstrap.version.noop.NoopContextManager;
 import rocks.inspectit.oce.core.instrumentation.context.ContextManagerImpl;
 
 import javax.annotation.PreDestroy;

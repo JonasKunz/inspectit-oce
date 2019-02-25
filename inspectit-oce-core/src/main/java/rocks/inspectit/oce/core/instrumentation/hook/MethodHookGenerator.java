@@ -1,5 +1,6 @@
 package rocks.inspectit.oce.core.instrumentation.hook;
 
+import io.opencensus.stats.StatsRecorder;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import net.bytebuddy.description.method.MethodDescription;
@@ -13,6 +14,7 @@ import rocks.inspectit.oce.core.instrumentation.config.model.MethodHookConfigura
 import rocks.inspectit.oce.core.instrumentation.context.ContextManager;
 import rocks.inspectit.oce.core.instrumentation.dataprovider.generic.BoundDataProvider;
 import rocks.inspectit.oce.core.instrumentation.dataprovider.generic.DataProviderGenerator;
+import rocks.inspectit.oce.core.metrics.MeasuresAndViewsManager;
 import rocks.inspectit.oce.core.utils.AutoboxingHelper;
 import rocks.inspectit.oce.core.utils.CommonUtils;
 
@@ -35,6 +37,12 @@ public class MethodHookGenerator {
 
     @Autowired
     private ContextManager contextManager;
+
+    @Autowired
+    private MeasuresAndViewsManager metricsManager;
+
+    @Autowired
+    private StatsRecorder statsRecorder;
 
     @Autowired
     private DataProviderGenerator dataProviderGenerator;
@@ -62,37 +70,20 @@ public class MethodHookGenerator {
         val exitActions = new CopyOnWriteArrayList<IHookAction>();
         addDataProviderCalls(declaringClass, signature, config, entryActions, exitActions);
 
-
-        entryActions.add(new IHookAction() {
-            @Override
-            public void execute(IHookAction.ExecutionContext ctx) {
-                log.info("###Entering {}", ctx.getHook().getMethodName());
-                ctx.getInspectitContext().getData().forEach(e -> log.info("###   {}={}", e.getKey(), e.getValue()));
-            }
-
-            @Override
-            public String getName() {
-                return "Enter-print";
-            }
-        });
-
-        exitActions.add(new IHookAction() {
-            @Override
-            public void execute(IHookAction.ExecutionContext ctx) {
-                log.info("###exiting {}", ctx.getHook().getMethodName());
-                ctx.getInspectitContext().getData().forEach(e -> log.info("###   {}={}", e.getKey(), e.getValue()));
-            }
-
-            @Override
-            public String getName() {
-                return "Exit-print";
-            }
-        });
+        addMetricsRecorder(config, exitActions);
 
         builder.entryActions(entryActions);
         builder.exitActions(exitActions);
 
         return builder.build();
+    }
+
+    private void addMetricsRecorder(MethodHookConfiguration config, CopyOnWriteArrayList<IHookAction> exitActions) {
+        if (!config.getConstantMetrics().isEmpty() || !config.getDataMetrics().isEmpty()) {
+
+            val recorder = new MetricsRecorder(config.getConstantMetrics(), config.getDataMetrics(), metricsManager, statsRecorder);
+            exitActions.add(recorder);
+        }
     }
 
     /**

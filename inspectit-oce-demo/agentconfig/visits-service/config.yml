@@ -1,12 +1,14 @@
 # See https://github.com/inspectIT/inspectit-oce/blob/0.1.M1/inspectit-oce-core/src/main/resources/config/default.yml
 # for all the configuration options.
 inspectit:
+  self-monitoring:
+    enabled: true
   logging:
     debug: true
   config:
     file-based:
       frequency: 1s
-      
+
   instrumentation:
     scopes:
       servlet_service:
@@ -16,14 +18,14 @@ inspectit:
           - name: service
         advanced:
           instrument-only-inherited-methods: true
-          
+
       methods_with_request_mapping:
         methods:
           - annotations:
               - name: org.springframework.web.bind.annotation.GetMapping
         advanced:
           disable-safety-mechanisms: true
-          
+
     dataproviders:
       get_bt_from_request_mapping:
         imports:
@@ -32,7 +34,7 @@ inspectit:
           methodName: String
           clazz: Class
           parameterTypes: Class[]
-        value-body: | 
+        value-body: |
           GetMapping gm = (GetMapping) (clazz.getDeclaredMethod(methodName,parameterTypes).getAnnotation(GetMapping.class));
           return gm.value()[0];
       get_request_servlet_path:
@@ -51,7 +53,7 @@ inspectit:
           val1: Object
           val2: Object
         value: "val1==null? val2 : val1"
-          
+
     rules:
       servlet_service:
         scopes: {servlet_service : true}
@@ -60,9 +62,9 @@ inspectit:
           temp: {provider: get_request_servlet_path}
           business_transaction:
             provider: get_first_non_null
-            data-input: 
+            data-input:
               val1: business_transaction
-            constant-input: 
+            constant-input:
               val2: "other"
 
         exit:
@@ -72,7 +74,7 @@ inspectit:
               sinceNanos: method_entry_time
         metrics:
           '[http/responsetime]' : method_duration
-          
+
       fetch_bt_from_request_mapping:
         scopes: {methods_with_request_mapping : true}
         entry:
@@ -86,13 +88,16 @@ inspectit:
         is-tag: false
 
   metrics:
+    # root setting for the polling frequency of all metrics
+    # when a metrics has no frequency defined separately, this frequency will be used
+    frequency: 1s
     definitions:
       '[http/responsetime]':
         unit: ms
         views:
-          '[http/responsetime/count]': 
+          '[http/responsetime/count]':
             aggregation: COUNT
             tags: {business_transaction: true}
-          '[http/responsetime/sum]': 
+          '[http/responsetime/sum]':
             aggregation: SUM
             tags: {business_transaction: true}

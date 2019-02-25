@@ -1,13 +1,36 @@
 # See https://github.com/inspectIT/inspectit-oce/blob/0.1.M1/inspectit-oce-core/src/main/resources/config/default.yml
 # for all the configuration options.
 inspectit:
+  self-monitoring:
+    enabled: true
   logging:
     debug: true
   config:
     file-based:
       frequency: 1s
-      
+
   instrumentation:
+#    # settings for special sensors
+#    special:
+#      # enables or disables the instrumentation to ensure context propagation across java.util.concurrent.Executor instances
+#      executor-context-propagation: true
+#      # enables or disables the instrumentation to ensure context propagation across java.lang.Thread instances
+#      thread-start-context-propagation: true
+#    # settings for fine-tuning the instrumentation process
+#    internal:
+#      # the time to pause between executing batches of class instrumentation updates
+#      inter-batch-delay: 1s
+#      # defines how many classes are checked at once for updates of their configuration
+#      class-configuration-check-batch-size: 100
+#      # defines the maximum number of classes which are retransformed at once per batch
+#      class-retransform-batch-size: 10
+#
+#      # defines how often the agent should check if new classes have been defined.
+#      # this check is only performed if Classloader.defineClass was called less than ${max-class-definition-delay} seconds ago
+#      new-class-discovery-interval: 10s
+#      # defines how often after the last invocation of a ClassFileTransformer the agent scans for new classes
+#      num-class-discovery-trials: 2
+#      # general settings regarding metrics capturing
     scopes:
       servlet_service:
         interfaces:
@@ -16,14 +39,14 @@ inspectit:
           - name: service
         advanced:
           instrument-only-inherited-methods: true
-          
+
       methods_with_request_mapping:
         methods:
           - annotations:
               - name: org.springframework.web.bind.annotation.GetMapping
         advanced:
           disable-safety-mechanisms: true
-          
+
     dataproviders:
       get_bt_from_request_mapping:
         imports:
@@ -32,7 +55,7 @@ inspectit:
           methodName: String
           clazz: Class
           parameterTypes: Class[]
-        value-body: | 
+        value-body: |
           GetMapping gm = (GetMapping) (clazz.getDeclaredMethod(methodName,parameterTypes).getAnnotation(GetMapping.class));
           return gm.value()[0];
       get_request_servlet_path:
@@ -51,7 +74,7 @@ inspectit:
           val1: Object
           val2: Object
         value: "val1==null? val2 : val1"
-          
+
     rules:
       servlet_service:
         scopes: {servlet_service : true}
@@ -60,9 +83,9 @@ inspectit:
           temp: {provider: get_request_servlet_path}
           business_transaction:
             provider: get_first_non_null
-            data-input: 
+            data-input:
               val1: business_transaction
-            constant-input: 
+            constant-input:
               val2: "other"
 
         exit:
@@ -72,7 +95,7 @@ inspectit:
               sinceNanos: method_entry_time
         metrics:
           '[http/responsetime]' : method_duration
-          
+
       fetch_bt_from_request_mapping:
         scopes: {methods_with_request_mapping : true}
         entry:
@@ -90,9 +113,9 @@ inspectit:
       '[http/responsetime]':
         unit: ms
         views:
-          '[http/responsetime/count]': 
+          '[http/responsetime/count]':
             aggregation: COUNT
             tags: {business_transaction: true}
-          '[http/responsetime/sum]': 
+          '[http/responsetime/sum]':
             aggregation: SUM
             tags: {business_transaction: true}

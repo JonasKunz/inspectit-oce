@@ -21,6 +21,7 @@ import java.util.regex.Pattern;
 public class GenericDataProviderSettings {
 
     public static final String PACKAGE_REGEX = "[a-zA-Z]\\w*(\\.[a-zA-Z]\\w*)*";
+
     public static final String THIZ_VARIABLE = "thiz";
     public static final String ARGS_VARIABLE = "args";
     public static final String THROWN_VARIABLE = "thrown";
@@ -28,12 +29,22 @@ public class GenericDataProviderSettings {
     public static final String ARG_VARIABLE_PREFIX = "arg";
     public static final Pattern ARG_VARIABLE_PATTERN = Pattern.compile(ARG_VARIABLE_PREFIX + "(\\d+)");
 
+    //these special variables are passed in via the additionalArguments array
+    public static final String CLAZZ_VARIABLE = "clazz";
+    public static final String METHOD_NAME_VARIABLE = "methodName";
+    public static final String METHOD_PARAMETER_TYPES_VARIABLE = "parameterTypes";
+
+
     private static final List<Pattern> SPECIAL_VARIABLES_REGEXES = Arrays.asList(
             Pattern.compile(THIZ_VARIABLE),
             Pattern.compile(ARGS_VARIABLE),
             Pattern.compile(THROWN_VARIABLE),
             Pattern.compile(RETURN_VALUE_VARIABLE),
-            ARG_VARIABLE_PATTERN);
+            ARG_VARIABLE_PATTERN,
+            Pattern.compile(CLAZZ_VARIABLE),
+            Pattern.compile(METHOD_NAME_VARIABLE),
+            Pattern.compile(METHOD_PARAMETER_TYPES_VARIABLE)
+    );
 
     /**
      * Defines the input variables used by this data provider.
@@ -43,6 +54,10 @@ public class GenericDataProviderSettings {
      * - argN: the N-th argument with which the instrumented method was invoked.
      * - args: an array of all arguments with which the instrumented method was invoked, the type must be Object[]
      * - returnValue: the value returned by the instrumented method,
+     * - clazz: the java.lang.{@link Class} defining the method being instrumented
+     * - methodName: the name of the method being instrumented, e.g. "hashcode", "doXYZ" or "<init>" for a constructor
+     * - argTypes: the types of the arguments with which the method is declared in form of a Class[] array
+     * <p>
      * null if void, the method threw an exception or the provider is not executed at the method exit
      * - thrown: the {@link Throwable}-Object raised by the the executed method, the type must be java.lang.Throwable
      * null if no throwable was raised
@@ -95,6 +110,24 @@ public class GenericDataProviderSettings {
     private boolean isThrownTypeCorrect() {
         String thrownType = input.get(THROWN_VARIABLE);
         return thrownType == null || thrownType.equals("java.lang.Throwable") || thrownType.equals("Throwable");
+    }
+
+    @AssertTrue(message = "The 'clazz' input must have the type 'Class'")
+    private boolean isClazzTypeCorrect() {
+        String clazzType = input.get(CLAZZ_VARIABLE);
+        return clazzType == null || clazzType.equals("Class") || clazzType.equals("java.lang.Class");
+    }
+
+    @AssertTrue(message = "The 'methodName' input must have the type 'String'")
+    private boolean isMethodNameTypeCorrect() {
+        String methodNameType = input.get(METHOD_NAME_VARIABLE);
+        return methodNameType == null || methodNameType.equals("String") || methodNameType.equals("java.lang.String");
+    }
+
+    @AssertTrue(message = "The 'parameterTypes' input must have the type 'Class[]'")
+    private boolean isParameterTypesTypeCorrect() {
+        String parameterTypesType = input.get(METHOD_PARAMETER_TYPES_VARIABLE);
+        return parameterTypesType == null || parameterTypesType.equals("Class[]") || parameterTypesType.equals("java.lang.Class[]");
     }
 
     public static boolean isSpecialVariable(String varName) {

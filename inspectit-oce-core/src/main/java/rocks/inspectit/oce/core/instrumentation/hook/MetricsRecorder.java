@@ -68,9 +68,11 @@ public class MetricsRecorder implements IHookAction {
                     if (value instanceof Number) {
                         recordMeasurement(measureMap, measureAndDataKey.getKey(), (Number) value);
                     } else {
-                        log.error("The value of data '{}' configured to be used for metric '{}' for method '{}' was not a number!" +
+                        MethodReflectionInformation methodInformation = context.getHook().getMethodInformation();
+                        String methodName = methodInformation.getDeclaringClass().getName() + "." + methodInformation.getName();
+                        log.error("The value of data '{}' configured to be used for metric '{}' for method '{}.{}' was not a number!" +
                                         " The recording of this metric is now disabled for this method!",
-                                measureAndDataKey.getValue(), measureAndDataKey.getKey(), context.getHook().getMethodName());
+                                measureAndDataKey.getValue(), measureAndDataKey.getKey(), methodName);
                         dataMetrics.remove(measureAndDataKey);
                     }
                 }

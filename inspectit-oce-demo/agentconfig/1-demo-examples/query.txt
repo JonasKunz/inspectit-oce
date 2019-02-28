@@ -1,0 +1,1 @@
+avg(rate(http_responsetime_sum[$__interval])) by (business_transaction) / avg(rate(http_responsetime_count[$__interval])) by (business_transaction) 

@@ -1,0 +1,10 @@
+# See https://github.com/inspectIT/inspectit-oce/blob/0.1.M1/inspectit-oce-core/src/main/resources/config/default.yml
+# for all the configuration options.
+inspectit:
+  instrumentation:
+    internal:
+      # the time to pause between executing batches of class instrumentation updates
+      inter-batch-delay: 1s
+      # defines how many classes are checked at once for updates of their configuration
+      class-configuration-check-batch-size: 100
+  

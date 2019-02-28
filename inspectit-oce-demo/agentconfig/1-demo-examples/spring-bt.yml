@@ -1,0 +1,33 @@
+# See https://github.com/inspectIT/inspectit-oce/blob/0.1.M1/inspectit-oce-core/src/main/resources/config/default.yml
+# for all the configuration options.
+inspectit:
+  instrumentation:
+  
+    scopes:
+      methods_with_get_mapping:
+        methods:
+          - annotations:
+              - name: org.springframework.web.bind.annotation.GetMapping
+        advanced:
+          disable-safety-mechanisms: true
+
+    dataproviders:
+    
+      get_bt_from_get_mapping:
+        imports:
+          - org.springframework.web.bind.annotation
+          - java.lang.reflect
+        input:
+          methodName: String
+          clazz: Class
+          parameterTypes: Class[]
+        value-body: |
+          Method self = clazz.getDeclaredMethod(methodName,parameterTypes);
+          GetMapping gm = (GetMapping) (self.getAnnotation(GetMapping.class));
+          return gm.value()[0];
+
+    rules:
+      fetch_bt_from_get_mapping:
+        scopes: {methods_with_get_mapping : true}
+        entry:
+          business_transaction: { provider: get_bt_from_get_mapping }

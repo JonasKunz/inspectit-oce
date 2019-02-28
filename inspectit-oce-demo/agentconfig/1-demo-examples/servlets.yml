@@ -1,0 +1,58 @@
+# See https://github.com/inspectIT/inspectit-oce/blob/0.1.M1/inspectit-oce-core/src/main/resources/config/default.yml
+# for all the configuration options.
+inspectit:
+  instrumentation:
+  
+    scopes:
+      servlet_service:
+        interfaces:
+          - name: javax.servlet.Servlet
+        methods:
+          - name: service
+        advanced:
+          instrument-only-inherited-methods: true
+
+    dataproviders:
+      get_or_default:
+        input:
+          value: Object
+          defaultValue: Object
+        value: "value == null ? defaultValue : value"
+
+    rules:
+      servlet_service:
+        scopes: {servlet_service : true}
+        entry:
+          method_entry_time: { provider: timestamp_nanos }
+
+        exit:
+          method_duration:
+            provider: elapsed_millis
+            data-input:
+              sinceNanos: method_entry_time
+          
+          business_transaction:
+            provider: get_or_default
+            data-input:
+              value: business_transaction
+            constant-input:
+              defaultValue: "other"
+        metrics:
+          '[http/responsetime]' : method_duration
+
+    data:
+      business_transaction:
+        up-propagation: JVM_LOCAL
+        down-propagation: JVM_LOCAL
+
+  metrics:
+    definitions:
+      '[http/responsetime]':
+        unit: ms
+        views:
+          '[http/responsetime/count]':
+            aggregation: COUNT
+            tags: {business_transaction: true}
+          '[http/responsetime/sum]':
+            aggregation: SUM
+            tags: {business_transaction: true}

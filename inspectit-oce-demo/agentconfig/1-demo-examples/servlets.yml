@@ -18,12 +18,25 @@ inspectit:
           value: Object
           defaultValue: Object
         value: "value == null ? defaultValue : value"
+        
+      get_request_servlet_path:
+        imports:
+          - javax.servlet
+          - javax.servlet.http
+        input:
+          arg0: ServletRequest
+        value-body: |
+          if(arg0 instanceof HttpServletRequest) {
+            return ((HttpServletRequest)arg0).getServletPath();
+          }
+          return null;
 
     rules:
       servlet_service:
         scopes: {servlet_service : true}
         entry:
           method_entry_time: { provider: timestamp_nanos }
+          http_path: {provider : get_request_servlet_path}
 
         exit:
           method_duration:

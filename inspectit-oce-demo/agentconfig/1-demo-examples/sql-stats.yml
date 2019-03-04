@@ -1,0 +1,115 @@
+# See https://github.com/inspectIT/inspectit-oce/blob/0.1.M1/inspectit-oce-core/src/main/resources/config/default.yml
+# for all the configuration options.
+inspectit:
+  instrumentation:
+  
+    scopes:
+      statement_execute:
+        interfaces:
+          - name: java.sql.Statement
+        methods:
+          - name: execute
+            matcher-mode: STARTS_WITH
+            visibility: [PUBLIC]
+
+    dataproviders:
+    
+      copy:
+        input:
+          val: Object
+        value: val
+    
+      add_and_get:
+        input:
+          valA: Number
+          valB: Number
+        value-body: |
+          if (valA == null && valB == null) return new Double(0.0);
+          if (valA == null) return valB;
+          if (valB == null) return valA;
+          return new Double(valA.doubleValue() + valB.doubleValue());
+            
+      subtract_and_get:
+        input:
+          valA: Number
+          valB: Number
+        value-body: |
+          if (valA == null && valB == null) return new Double(0.0);
+          if (valA == null) return new Double(-valB.doubleValue());
+          if (valB == null) return valA;
+          return new Double(valA.doubleValue() - valB.doubleValue());
+
+
+    rules:
+      increment_sql_stats:
+        scopes: {statement_execute : true}
+        entry:
+          method_entry_time: { provider: timestamp_nanos }
+        exit:
+          method_duration:
+            provider: elapsed_millis
+            data-input:
+              sinceNanos: method_entry_time
+          total_sql_time:
+            provider: add_and_get
+            data-input: {valA : total_sql_time, valB: method_duration}
+          total_sql_count:
+            provider: add_and_get
+            data-input: {valA : total_sql_count}
+            constant-input: {valB: 1}
+            
+      record_servlet_sql_stats:
+        scopes: {servlet_service : true}
+        entry:
+          entry_sql_count: {provider: copy, data-input: {val: total_sql_count}}
+          entry_sql_time: {provider: copy, data-input: {val: total_sql_time}}
+        exit:
+          delta_sql_count: 
+            provider: subtract_and_get
+            data-input: {valA: total_sql_count, valB: entry_sql_count}
+          delta_sql_time: 
+            provider: subtract_and_get
+            data-input: {valA: total_sql_time, valB: entry_sql_time}
+        metrics:
+          '[http/sql/querycount]': delta_sql_count
+          '[http/sql/querytime]': delta_sql_time
+          
+    data:
+      entry_sql_time:
+        down-propagation: NONE
+        is-tag: false
+        
+      entry_sql_count:
+        down-propagation: NONE
+        is-tag: false
+        
+      sql_time_delta:
+        down-propagation: NONE
+        is-tag: false
+        
+      sql_count_delta:
+        down-propagation: NONE
+        is-tag: false
+        
+      total_sql_time:
+        up-propagation: JVM_LOCAL
+        down-propagation: JVM_LOCAL
+        is-tag: false
+      total_sql_count:
+        up-propagation: JVM_LOCAL
+        down-propagation: JVM_LOCAL
+        is-tag: false
+  metrics:
+    definitions:
+      '[http/sql/querycount]':
+        unit: queries
+        views:
+          '[http/sql/querycount]':
+            aggregation: LAST_VALUE
+            tags: {http_path: true}
+      '[http/sql/querytime]':
+        unit: ms
+        views:
+          '[http/sql/querytime]':
+            aggregation: LAST_VALUE
+            tags: {http_path: true}

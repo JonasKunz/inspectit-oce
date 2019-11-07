@@ -5,8 +5,11 @@ import io.opencensus.trace.*;
 import io.opencensus.trace.samplers.Samplers;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.extern.slf4j.Slf4j;
+import rocks.inspectit.ocelot.bootstrap.Instances;
 import rocks.inspectit.ocelot.bootstrap.exposed.InspectitContext;
 import rocks.inspectit.ocelot.config.model.instrumentation.rules.RuleTracingSettings;
+import rocks.inspectit.ocelot.core.instrumentation.autotracing.StackTraceSampler;
 import rocks.inspectit.ocelot.core.instrumentation.context.InspectitContextImpl;
 import rocks.inspectit.ocelot.core.instrumentation.hook.MethodReflectionInformation;
 import rocks.inspectit.ocelot.core.instrumentation.hook.VariableAccessor;
@@ -16,11 +19,14 @@ import rocks.inspectit.ocelot.core.instrumentation.hook.tags.CommonTagsToAttribu
 import java.util.function.Predicate;
 
 /**
- * Invokes {@link InspectitContextImpl#enterSpan(Span)} on the currently active context.
+ * Invokes {@link InspectitContextImpl#setSpanScope(AutoCloseable)} on the currently active context.
  */
 @AllArgsConstructor
 @Builder
+@Slf4j
 public class ContinueOrStartSpanAction implements IHookAction {
+
+    private StackTraceSampler stackTraceSampler;
 
     /**
      * The variable accessor used to fetch the name for a newly began span.
@@ -66,6 +72,8 @@ public class ContinueOrStartSpanAction implements IHookAction {
      */
     private Predicate<ExecutionContext> startSpanCondition;
 
+    private final Boolean autoTrace;
+
     /**
      * Action that optionally adds common tags to the newly started span.
      */
@@ -89,7 +97,7 @@ public class ContinueOrStartSpanAction implements IHookAction {
             InspectitContextImpl ctx = context.getInspectitContext();
             Object spanObj = ctx.getData(continueSpanDataKey);
             if (spanObj instanceof Span) {
-                ctx.enterSpan((Span) spanObj);
+                enterSpanOnContext((Span) spanObj, ctx);
                 return true;
             }
         }
@@ -123,13 +131,21 @@ public class ContinueOrStartSpanAction implements IHookAction {
                 builder.setSampler(sampler);
             }
 
-            // start span and add common tags
             final Span span = builder.startSpan();
+            enterSpanOnContext(span, ctx);
             commonTagsToAttributesManager.writeCommonTags(span, remoteParent != null, hasLocalParent);
 
-            // enter in the our context
-            ctx.enterSpan(span);
         }
+    }
+
+    private void enterSpanOnContext(Span span, InspectitContextImpl ctx) {
+        AutoCloseable spanCtx = Instances.logTraceCorrelator.startCorrelatedSpanScope(() -> Tracing.getTracer().withSpan(span));
+
+        if (autoTrace != null && autoTrace) {
+            spanCtx = stackTraceSampler.scoped(spanCtx);
+        }
+
+        ctx.setSpanScope(spanCtx);
     }
 
     /**

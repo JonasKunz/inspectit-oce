@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import rocks.inspectit.ocelot.config.model.instrumentation.rules.MetricRecordingSettings;
 import rocks.inspectit.ocelot.config.model.instrumentation.rules.RuleTracingSettings;
+import rocks.inspectit.ocelot.core.instrumentation.autotracing.StackTraceSampler;
 import rocks.inspectit.ocelot.core.instrumentation.config.model.ActionCallConfig;
 import rocks.inspectit.ocelot.core.instrumentation.config.model.MethodHookConfiguration;
 import rocks.inspectit.ocelot.core.instrumentation.context.ContextManager;
@@ -55,6 +56,9 @@ public class MethodHookGenerator {
 
     @Autowired
     private CommonTagsToAttributesManager commonTagsToAttributesManager;
+
+    @Autowired
+    private StackTraceSampler stackTraceSampler;
 
     /**
      * Builds a executable method hook based on the given configuration.
@@ -118,6 +122,8 @@ public class MethodHookGenerator {
             } else {
                 actionBuilder.continueSpanCondition(ctx -> false);
             }
+            actionBuilder.autoTrace(tracing.getAutoTrace());
+            actionBuilder.stackTraceSampler(stackTraceSampler);
 
             val result = new ArrayList<IHookAction>();
             result.add(actionBuilder.build());

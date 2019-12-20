@@ -97,7 +97,7 @@ public class ContinueOrStartSpanAction implements IHookAction {
             InspectitContextImpl ctx = context.getInspectitContext();
             Object spanObj = ctx.getData(continueSpanDataKey);
             if (spanObj instanceof Span) {
-                enterSpanOnContext((Span) spanObj, ctx);
+                enterSpanOnContext((Span) spanObj, ctx, stackTraceSampler.enterFixPoint());
                 return true;
             }
         }
@@ -108,6 +108,9 @@ public class ContinueOrStartSpanAction implements IHookAction {
         if (startSpanCondition.test(context)) {
             // resolve span name
             InspectitContextImpl ctx = context.getInspectitContext();
+
+            AutoCloseable samplingFixPoint = stackTraceSampler.enterFixPoint();
+
             String spanName = getSpanName(context, context.getHook().getMethodInformation());
 
             // load remote parent if it exist
@@ -132,17 +135,25 @@ public class ContinueOrStartSpanAction implements IHookAction {
             }
 
             final Span span = builder.startSpan();
-            enterSpanOnContext(span, ctx);
+            enterSpanOnContext(span, ctx, samplingFixPoin);
             commonTagsToAttributesManager.writeCommonTags(span, remoteParent != null, hasLocalParent);
 
         }
     }
 
-    private void enterSpanOnContext(Span span, InspectitContextImpl ctx) {
+    private void enterSpanOnContext(Span span, InspectitContextImpl ctx, AutoCloseable samplingFixPoint) {
         AutoCloseable spanCtx = Instances.logTraceCorrelator.startCorrelatedSpanScope(() -> Tracing.getTracer().withSpan(span));
 
-        if (autoTrace != null && autoTrace) {
+        if ((autoTrace != null && autoTrace) || (autoTrace == null && samplingFixPoint != null)) {
             spanCtx = stackTraceSampler.scoped(spanCtx);
+        }
+
+        if (samplingFixPoint != null) {
+            AutoCloseable wrapped = spanCtx;
+            spanCtx = () -> {
+                wrapped.close();
+                samplingFixPoint.close();
+            };
         }
 
         ctx.setSpanScope(spanCtx);

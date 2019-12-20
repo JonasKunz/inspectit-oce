@@ -3,6 +3,7 @@ package rocks.inspectit.ocelot.core.instrumentation.autotracing;
 import io.opencensus.common.Clock;
 import io.opencensus.trace.AttributeValue;
 import io.opencensus.trace.Span;
+import io.opencensus.trace.SpanId;
 import io.opencensus.trace.Tracing;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -78,6 +79,23 @@ public class StackTraceSampler {
         }
     }
 
+    public AutoCloseable enterFixPoint() {
+        Thread self = Thread.currentThread();
+        SampledTrace activeTrace = activeSamplings.remove(self);
+        if (activeTrace != null) {
+            StackTrace st = StackTrace.createForCurrentThread();
+            st.removeStackTop(); //the method itself should not be part of the sampled trace, as it is manually instrumented
+            Span fixPointSpan = activeTrace.createFixPoint(st, clock.nowNanos());
+            AutoCloseable spanScope = Tracing.getTracer().withSpan(fixPointSpan);
+            return () -> {
+                spanScope.close();
+                activeTrace.add(st, clock.nowNanos());
+                activeSamplings.put(self, activeTrace);
+            };
+        }
+        return null;
+    }
+
     /**
      * Starts stack-trace sampling for the current thread.
      * Sampling will only be activated, if there is an OpenCensus span on the context which also is sampled (in terms of Span-Sampling).
@@ -122,8 +140,13 @@ public class StackTraceSampler {
      * @param invoc  the invocation to export as span
      */
     private void convertAndExport(Span parent, SampledSpan invoc) {
+        SpanId spanId = null;
+        if (invoc.getFixPoint() != null) {
+            spanId = invoc.getFixPoint().getContext().getSpanId();
+        }
         Span span = CustomSpanBuilder.builder("*" + invoc.getSimpleName(), parent)
                 .customTiming(invoc.getEntryTime(), invoc.getExitTime(), null)
+                .spanId(spanId)
                 .startSpan();
         span.putAttribute("sampled", AttributeValue.booleanAttributeValue(true));
         span.putAttribute("fqn", AttributeValue.stringAttributeValue(invoc.getFullName()));

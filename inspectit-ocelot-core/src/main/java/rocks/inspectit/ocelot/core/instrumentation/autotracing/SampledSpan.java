@@ -2,6 +2,7 @@ package rocks.inspectit.ocelot.core.instrumentation.autotracing;
 
 import io.opencensus.trace.Span;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -23,6 +24,10 @@ public class SampledSpan {
      * The stack trace element defining this method.
      */
     private StackTraceElement methodInfo;
+
+    @Setter
+    @Getter
+    private FixPointSpan fixPoint;
 
     /**
      * The stack trace element defining this method.

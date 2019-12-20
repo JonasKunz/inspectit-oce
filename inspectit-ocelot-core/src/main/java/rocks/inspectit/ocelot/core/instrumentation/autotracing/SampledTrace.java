@@ -129,6 +129,23 @@ public class SampledTrace {
         }
     }
 
+    public synchronized Span createFixPoint(StackTrace fixpoint, long timestamp) {
+        add(fixpoint, timestamp);
+        add(fixpoint, timestamp);
+        SampledSpan current = root;
+        while (current.getLastChild() != null) {
+            current = current.getLastChild();
+        }
+        if (current == root) {
+            return rootSpan;
+        } else {
+            if (current.getFixPoint() == null) {
+                current.setFixPoint(new FixPointSpan(rootSpan.getContext()));
+            }
+            return current.getFixPoint();
+        }
+    }
+
     /**
      * @return true, if {@link #end()} was called, false otherwise
      */

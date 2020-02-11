@@ -7,17 +7,18 @@ import io.opencensus.trace.SpanId;
 import io.opencensus.trace.Tracing;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
+import rocks.inspectit.ocelot.config.model.tracing.AutoTracingSettings;
+import rocks.inspectit.ocelot.core.config.InspectitConfigChangedEvent;
 import rocks.inspectit.ocelot.core.config.InspectitEnvironment;
+import rocks.inspectit.ocelot.core.utils.HighPrecisionTimer;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Component for executing stack-trace-sampling (=auto-tracing).
@@ -29,9 +30,6 @@ public class StackTraceSampler {
     @Autowired
     private InspectitEnvironment env;
 
-    @Autowired
-    private ScheduledExecutorService scheduledExecutor;
-
     /**
      * Global map which stores all threads for which stack-trace sampling is currently active.
      * If a thread is present in this map, it will be sampled and the stack trace will be added to the corresponding trace.
@@ -39,7 +37,7 @@ public class StackTraceSampler {
      */
     private ConcurrentHashMap<Thread, SampledTrace> activeSamplings = new ConcurrentHashMap<>();
 
-    private Future<?> sampleTask;
+    private HighPrecisionTimer sampleTimer;
 
     /**
      * The clock used for timing the stack-traces.
@@ -47,15 +45,24 @@ public class StackTraceSampler {
      */
     private Clock clock = Tracing.getClock();
 
+
     @PostConstruct
     void init() {
-        //TODO: replace with a dynamically configurable & starting timer
-        sampleTask = scheduledExecutor.scheduleAtFixedRate(this::doSample, 50, 50, TimeUnit.MILLISECONDS);
+        AutoTracingSettings settings = env.getCurrentConfig().getTracing().getAutoTracing();
+        sampleTimer = new HighPrecisionTimer("Ocelot stack trace sampler", settings.getFrequency(),
+                settings.getShutdownDelay(), this::doSample);
+    }
+
+    @EventListener(InspectitConfigChangedEvent.class)
+    void updateTimer() {
+        AutoTracingSettings settings = env.getCurrentConfig().getTracing().getAutoTracing();
+        sampleTimer.setPeriod(settings.getFrequency());
+        sampleTimer.setMaximumInactivity(settings.getShutdownDelay());
     }
 
     @PreDestroy
     void shutdown() {
-        sampleTask.cancel(false);
+        sampleTimer.destroy();
     }
 
     /**
@@ -113,6 +120,7 @@ public class StackTraceSampler {
             StackTrace startStackTrace = StackTrace.createForCurrentThread();
             SampledTrace trace = new SampledTrace(root, startStackTrace, clock.nowNanos());
             activeSamplings.put(self, trace);
+            sampleTimer.start();
             return true;
         }
         return false;
@@ -165,21 +173,27 @@ public class StackTraceSampler {
 
     /**
      * Method invoked by a timer to sample all threads for which stack trace sampling is activated.
+     * Returns true, if any sampling was performed
      */
-    private void doSample() {
+    private boolean doSample() {
         //copy the map to avoid concurrent modifications due to startSampling() and finishSampling()
         Map<Thread, SampledTrace> samplingsCopy = new HashMap<>(activeSamplings);
 
         Map<Thread, StackTrace> stackTraces = StackTrace.createFor(samplingsCopy.keySet());
         long timestamp = clock.nowNanos();
 
+        boolean anySampled = false;
+
         for (Thread thread : samplingsCopy.keySet()) {
             SampledTrace trace = samplingsCopy.get(thread);
             StackTrace stackTrace = stackTraces.get(thread);
             if (activeSamplings.get(thread) == trace) { //recheck for concurrent finishSampling() calls
+                anySampled = true;
                 trace.add(stackTrace, timestamp); //has no effect if the trace was finished concurrently
             }
         }
+
+        return anySampled;
     }
 
 }

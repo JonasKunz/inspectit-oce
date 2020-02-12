@@ -91,7 +91,6 @@ public class ContinueOrStartSpanAction implements IHookAction {
         }
     }
 
-
     private boolean continueSpan(ExecutionContext context) {
         if (continueSpanDataKey != null && continueSpanCondition.test(context)) {
             InspectitContextImpl ctx = context.getInspectitContext();
@@ -122,7 +121,7 @@ public class ContinueOrStartSpanAction implements IHookAction {
             if (remoteParent != null) {
                 builder = Tracing.getTracer().spanBuilderWithRemoteParent(spanName, remoteParent);
             } else {
-                final Span currentSpan = Tracing.getTracer().getCurrentSpan();
+                Span currentSpan = Tracing.getTracer().getCurrentSpan();
                 hasLocalParent = currentSpan != BlankSpan.INSTANCE;
                 builder = Tracing.getTracer().spanBuilder(spanName);
             }
@@ -134,15 +133,16 @@ public class ContinueOrStartSpanAction implements IHookAction {
                 builder.setSampler(sampler);
             }
 
-            final Span span = builder.startSpan();
-            enterSpanOnContext(span, ctx, samplingFixPoin);
+            Span span = builder.startSpan();
+            enterSpanOnContext(span, ctx, samplingFixPoint);
             commonTagsToAttributesManager.writeCommonTags(span, remoteParent != null, hasLocalParent);
 
         }
     }
 
     private void enterSpanOnContext(Span span, InspectitContextImpl ctx, AutoCloseable samplingFixPoint) {
-        AutoCloseable spanCtx = Instances.logTraceCorrelator.startCorrelatedSpanScope(() -> Tracing.getTracer().withSpan(span));
+        AutoCloseable spanCtx = Instances.logTraceCorrelator.startCorrelatedSpanScope(() -> Tracing.getTracer()
+                .withSpan(span));
 
         if ((autoTrace != null && autoTrace) || (autoTrace == null && samplingFixPoint != null)) {
             spanCtx = stackTraceSampler.scoped(spanCtx);

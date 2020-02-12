@@ -16,9 +16,12 @@ import rocks.inspectit.ocelot.core.utils.HighPrecisionTimer;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * Component for executing stack-trace-sampling (=auto-tracing).
@@ -135,8 +138,9 @@ public class StackTraceSampler {
         if (trace != null) {
             //TODO: offload the trace finishing and exporting to a different Thread
             trace.end();
-            trace.getRoot().getChildren().forEach(
-                    child -> convertAndExport(trace.getRootSpan(), child)
+            SampledSpan rootInvocation = trace.getRoot();
+            rootInvocation.getChildren().forEach(
+                    child -> convertAndExport(rootInvocation, trace.getRootSpan(), child, new ArrayList<>())
             );
         }
     }
@@ -147,28 +151,49 @@ public class StackTraceSampler {
      * @param parent The parent span to use for this {@link SampledSpan}
      * @param invoc  the invocation to export as span
      */
-    private void convertAndExport(Span parent, SampledSpan invoc) {
+    private void convertAndExport(SampledSpan realParent, Span parent, SampledSpan invoc, List<SampledSpan> collapsedParents) {
         SpanId spanId = null;
+
+        boolean collapseSpan = false;
+
         if (invoc.getFixPoint() != null) {
             spanId = invoc.getFixPoint().getContext().getSpanId();
+        } else {
+            if (invoc.getChildren().size() == 1) {
+                SampledSpan child = invoc.getLastChild();
+                boolean childHasSameTime = child.getEntryTime() == invoc.getEntryTime() && child.getExitTime() == invoc.getExitTime();
+                boolean parentHasSameTime = realParent.getEntryTime() == invoc.getEntryTime() && realParent.getExitTime() == invoc.getExitTime();
+                collapseSpan = childHasSameTime && parentHasSameTime;
+            }
         }
-        Span span = CustomSpanBuilder.builder("*" + invoc.getSimpleName(), parent)
-                .customTiming(invoc.getEntryTime(), invoc.getExitTime(), null)
-                .spanId(spanId)
-                .startSpan();
-        span.putAttribute("sampled", AttributeValue.booleanAttributeValue(true));
-        span.putAttribute("fqn", AttributeValue.stringAttributeValue(invoc.getFullName()));
-        String source = invoc.getDeclaringSourceFile();
-        if (source != null) {
-            span.putAttribute("source", AttributeValue.stringAttributeValue(source));
-        }
-        String callOrigin = invoc.getCallOrigin();
-        if (callOrigin != null) {
-            span.putAttribute("calledFrom", AttributeValue.stringAttributeValue(callOrigin));
-        }
-        span.end();
+        if (!collapseSpan) {
+            Span span = CustomSpanBuilder.builder("*" + invoc.getSimpleName(), parent)
+                    .customTiming(invoc.getEntryTime(), invoc.getExitTime(), null)
+                    .spanId(spanId)
+                    .startSpan();
+            span.putAttribute("sampled", AttributeValue.booleanAttributeValue(true));
+            span.putAttribute("fqn", AttributeValue.stringAttributeValue(invoc.getFullName()));
+            if (!collapsedParents.isEmpty()) {
+                String parents = collapsedParents.stream()
+                        .map(sp -> sp.getFullName() + (sp.getDeclaringSourceFile() == null ? "" : " (" + sp.getDeclaringSourceFile() + ")"))
+                        .collect(Collectors.joining("\n"));
+                span.putAttribute("parentFrames", AttributeValue.stringAttributeValue(parents));
+            }
+            String source = invoc.getDeclaringSourceFile();
+            if (source != null) {
+                span.putAttribute("source", AttributeValue.stringAttributeValue(source));
+            }
+            String callOrigin = invoc.getCallOrigin();
+            if (callOrigin != null) {
+                span.putAttribute("calledFrom", AttributeValue.stringAttributeValue(callOrigin));
+            }
+            span.end();
 
-        invoc.getChildren().forEach(grandChild -> convertAndExport(span, grandChild));
+            invoc.getChildren().forEach(grandChild -> convertAndExport(invoc, span, grandChild, new ArrayList<>()));
+        } else {
+            collapsedParents.add(invoc);
+            invoc.getChildren().forEach(grandChild -> convertAndExport(invoc, parent, grandChild, collapsedParents));
+        }
     }
 
     /**
